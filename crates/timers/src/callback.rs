@@ -59,7 +59,12 @@ impl Timeout {
     where
         F: 'static + FnOnce(),
     {
-        let closure = Closure::once(callback);
+        // `Closure::once_assert_unwind_safe` rather than `Closure::once`: the engine builds this
+        // crate for wasm with `-C panic=unwind`, where wasm-bindgen catches a
+        // panic raised inside a callback the browser invoked and asks the
+        // callback's captures to be unwind-safe first. The callback is the
+        // caller's own, handed straight through.
+        let closure = Closure::once_assert_unwind_safe(callback);
 
         let id = set_timeout(
             closure.as_ref().unchecked_ref::<js_sys::Function>(),
@@ -160,7 +165,12 @@ impl Interval {
     where
         F: 'static + FnMut(),
     {
-        let closure = Closure::wrap(Box::new(callback) as Box<dyn FnMut()>);
+        // `Closure::wrap_assert_unwind_safe` rather than `Closure::wrap`: the engine builds this
+        // crate for wasm with `-C panic=unwind`, where wasm-bindgen catches a
+        // panic raised inside a callback the browser invoked and asks the
+        // callback's captures to be unwind-safe first. The callback is the
+        // caller's own, handed straight through.
+        let closure = Closure::wrap_assert_unwind_safe(Box::new(callback) as Box<dyn FnMut()>);
 
         let id = set_interval(
             closure.as_ref().unchecked_ref::<js_sys::Function>(),
