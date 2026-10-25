@@ -120,7 +120,12 @@ impl EventSource {
         let message_callback: Closure<dyn FnMut(MessageEvent)> = {
             let event_type = event_type.clone();
             let sender = message_sender.clone();
-            Closure::wrap(Box::new(move |e: MessageEvent| {
+            // `Closure::wrap_assert_unwind_safe` rather than `Closure::wrap`: the
+            // engine builds this crate for wasm with `-C panic=unwind`, where
+            // wasm-bindgen catches a panic raised inside a callback the browser
+            // invoked and asks the callback's captures to be unwind-safe first.
+            // Each callback below pushes an event onto the stream's own sender.
+            Closure::wrap_assert_unwind_safe(Box::new(move |e: MessageEvent| {
                 let event_type = event_type.clone();
                 let _ = sender.unbounded_send(StreamMessage::Message(event_type, e));
             }) as Box<dyn FnMut(MessageEvent)>)
@@ -134,7 +139,7 @@ impl EventSource {
             .map_err(js_to_js_error)?;
 
         let error_callback: Closure<dyn FnMut(web_sys::Event)> = {
-            Closure::wrap(Box::new(move |e: web_sys::Event| {
+            Closure::wrap_assert_unwind_safe(Box::new(move |e: web_sys::Event| {
                 let is_connecting = e
                     .current_target()
                     .map(|target| target.unchecked_into::<web_sys::EventSource>())
